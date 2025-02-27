@@ -1,5 +1,4 @@
 import streamlit as st
-import sympy as sympy
 from sympy import symbols, Function, Eq, Derivative, dsolve, classify_ode, latex
 from sympy.parsing.sympy_parser import parse_expr
 
