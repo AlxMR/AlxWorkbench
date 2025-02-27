@@ -3,7 +3,7 @@ from sympy import symbols, Function, Eq, Derivative, dsolve, classify_ode, latex
 from sympy.parsing.sympy_parser import parse_expr
 
 # Configuración de la página
-st.set_page_config(page_title="Reconocimiento de Ecuaciones Diferenciales", layout="wide")
+st.set_page_config(page_title="Reconocimiento de Ecuaciones Diferenciales", layout="centered")
 
 # Título de la aplicación
 st.title("Reconocimiento y Solución de Ecuaciones Diferenciales")
