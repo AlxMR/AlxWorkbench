@@ -2,4 +2,6 @@ streamlit==1.26.0
 sympy==1.12
 numpy==1.26
 setuptools>=58
+wheel
+pillow>=9.0.0
 
