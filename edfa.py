@@ -7,7 +7,7 @@ from pydantic import BaseModel
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://ed-frontend-theta.vercel.app"],  # Dominio de tu frontend
+    allow_origins=["https://ed-frontend-theta.vercel.app/"],  # Dominio de tu frontend
     allow_credentials=True,
     allow_methods=["*"],  # Permite todos los métodos (GET, POST, etc.)
     allow_headers=["*"],  # Permite todos los encabezados
