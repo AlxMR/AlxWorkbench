@@ -1,9 +1,17 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sympy import symbols, Function, Eq, Derivative, dsolve, classify_ode, latex
 from sympy.parsing.sympy_parser import parse_expr
 from pydantic import BaseModel
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://ed-frontend-theta.vercel.app"],  # Dominio de tu frontend
+    allow_credentials=True,
+    allow_methods=["*"],  # Permite todos los métodos (GET, POST, etc.)
+    allow_headers=["*"],  # Permite todos los encabezados
+)
 
 # Modelo para la solicitud
 class EquationRequest(BaseModel):
