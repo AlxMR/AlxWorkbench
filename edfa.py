@@ -53,6 +53,9 @@ async def solve_ode(request: EquationRequest):
         except NotImplementedError:
             solution_latex = "No se pudo encontrar una solución analítica."
 
+        # Convertir la ecuación ingresada a LaTeX
+        recommended_formula = latex(eq)
+
         # Respuesta
         return {
             "classification": {
@@ -62,6 +65,7 @@ async def solve_ode(request: EquationRequest):
                 "homogeneity": 'Homogénea' if len(classification) >= 4 and classification[3] else 'No homogénea',
             },
             "method": method,
+            "recommended_formula": recommended_formula,  # Fórmula recomendada en LaTeX
             "solution": solution_latex,
         }
     except Exception as e:
