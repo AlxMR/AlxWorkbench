@@ -64,3 +64,11 @@ async def solve_ode(request: EquationRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error al procesar la ecuación: {e}")
+@app.options("/")
+async def handle_options():
+    return {"message": "OK"}
+
+# Ruta para manejar solicitudes OPTIONS en /solve-ode
+@app.options("/solve-ode")
+async def handle_solve_ode_options():
+    return {"message": "OK"}
