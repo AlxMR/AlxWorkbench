@@ -19,11 +19,11 @@ app.add_middleware(
 class EquationRequest(BaseModel):
     equation: str
 
-# Definir símbolos y funciones
+# Definir símbolos y función desconocida
 x = symbols('x')
 y = Function('y')(x)
 
-# Fórmulas generales de los métodos recomendados
+# Diccionario con fórmulas generales de los métodos recomendados
 METHOD_FORMULAS = {
     "Separación de variables": r"\frac{dy}{dx} = g(x)h(y) \Rightarrow \int \frac{1}{h(y)} \, dy = \int g(x) \, dx",
     "Ecuaciones lineales de primer orden": r"\frac{dy}{dx} + P(x)y = Q(x)",
@@ -37,24 +37,29 @@ async def solve_ode(request: EquationRequest):
 
     try:
         # Convertir la entrada en una expresión simbólica
-        equation = parse_expr(equation_input, local_dict={'y': y, 'x': x, 'Derivative': Derivative})
-        eq = Eq(equation, 0)
+        local_dict = {'y': y, 'x': x, 'Derivative': Derivative}
+        equation = parse_expr(equation_input, local_dict=local_dict)
 
-        # Clasificación de la ecuación
+        # Si la ecuación ya está igualada a cero, la usamos directamente
+        if isinstance(equation, Eq):
+            eq = equation
+        else:
+            eq = Eq(equation, 0)
+
+        # Clasificación de la ecuación diferencial
         classification = classify_ode(eq, y)
 
         # Método de solución recomendado
-        method = ""
-        if 'separable' in str(classification):
-            method = "Separación de variables"
-        elif 'linear' in str(classification):
-            method = "Ecuaciones lineales de primer orden"
-        elif 'Bernoulli' in str(classification):
-            method = "Ecuación de Bernoulli"
-        else:
-            method = "No se pudo determinar un método específico."
+        method = "No se pudo determinar un método específico."
+        if isinstance(classification, tuple):
+            if "separable" in classification:
+                method = "Separación de variables"
+            elif "1st_linear" in classification:  # Nombre correcto para ecuaciones lineales de primer orden
+                method = "Ecuaciones lineales de primer orden"
+            elif "Bernoulli" in classification:
+                method = "Ecuación de Bernoulli"
 
-        # Solución de la ecuación
+        # Solución de la ecuación diferencial
         try:
             solution = dsolve(eq, y)
             solution_latex = latex(solution)
@@ -64,13 +69,13 @@ async def solve_ode(request: EquationRequest):
         # Obtener la fórmula general del método recomendado
         recommended_formula = METHOD_FORMULAS.get(method, r"\text{No hay fórmula general disponible}")
 
-        # Respuesta
+        # Construcción de la respuesta
         return {
             "classification": {
                 "type": 'Ordinaria' if 'ordinary' in str(classification) else 'Parcial',
                 "order": classification[1] if len(classification) >= 2 else None,
-                "linearity": 'Lineal' if len(classification) >= 3 and classification[2] else 'No lineal',
-                "homogeneity": 'Homogénea' if len(classification) >= 4 and classification[3] else 'No homogénea',
+                "linearity": 'Lineal' if "1st_linear" in classification else 'No lineal',
+                "homogeneity": 'Homogénea' if "homogeneous" in classification else 'No homogénea',
             },
             "method": method,
             "recommended_formula": recommended_formula,  # Fórmula general del método recomendado
