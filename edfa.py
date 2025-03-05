@@ -44,14 +44,15 @@ async def solve_ode(request: EquationRequest):
         classification = classify_ode(eq, y)
 
         # Método de solución recomendado
-        method = "No se pudo determinar un método específico."
-        if isinstance(classification, tuple):
-            if "separable" in classification:
-                method = "Separación de variables"
-            elif "1st_linear" in classification:
-                method = "Ecuaciones lineales de primer orden"
-            elif "Bernoulli" in classification:
-                method = "Ecuación de Bernoulli"
+        method = ""
+        if 'separable' in str(classification):
+            method = "Separación de variables"
+        elif 'linear' in str(classification):
+            method = "Ecuaciones lineales de primer orden"
+        elif 'Bernoulli' in str(classification):
+            method = "Ecuación de Bernoulli"
+        else:
+            method = "No se pudo determinar un método específico."
 
         # Solución de la ecuación
         try:
