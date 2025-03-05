@@ -5,12 +5,14 @@ from sympy.parsing.sympy_parser import parse_expr
 from pydantic import BaseModel
 
 app = FastAPI()
+
+# Configuración de CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://ed-frontend-theta.vercel.app/"],  # Dominio de tu frontend
+    allow_origins=["https://ed-frontend-theta.vercel.app"],  # Dominio de tu frontend
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Permite todos los métodos (GET, POST, etc.)
-    allow_headers=["*"],  # Permite todos los encabezados
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Métodos permitidos
+    allow_headers=["*"],  # Encabezados permitidos
 )
 
 # Modelo para la solicitud
@@ -51,6 +53,9 @@ async def solve_ode(request: EquationRequest):
         except NotImplementedError:
             solution_latex = "No se pudo encontrar una solución analítica."
 
+        # Convertir la ecuación ingresada a LaTeX
+        recommended_formula = latex(eq)
+
         # Respuesta
         return {
             "classification": {
@@ -60,10 +65,13 @@ async def solve_ode(request: EquationRequest):
                 "homogeneity": 'Homogénea' if len(classification) >= 4 and classification[3] else 'No homogénea',
             },
             "method": method,
+            "recommended_formula": recommended_formula,  # Fórmula recomendada en LaTeX
             "solution": solution_latex,
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error al procesar la ecuación: {e}")
+
+# Ruta para manejar solicitudes OPTIONS en la raíz
 @app.options("/")
 async def handle_options():
     return {"message": "OK"}
