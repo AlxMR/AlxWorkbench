@@ -57,14 +57,18 @@ async def solve_ode(request: EquationRequest):
             best_classification = classification[0]
 
             # Priorizar métodos de forma correcta
-            if best_classification == "Bernoulli":
-                method = "Ecuación de Bernoulli"
-            elif best_classification == "1st_linear":
+            if best_classification == "1st_linear":
                 method = "Ecuaciones lineales de primer orden"
+            elif best_classification == "Bernoulli":
+                method = "Ecuación de Bernoulli"
             elif best_classification == "separable":
                 method = "Separación de variables"
             else:
                 method = "No se pudo determinar un método específico."
+
+        # CORRECCIÓN: Detectar ecuaciones de la forma dy/dx = f(x)
+        if best_classification == "separable" and "1st_linear" in classification:
+            method = "Ecuaciones lineales de primer orden"
 
         # Solución de la ecuación diferencial
         try:
