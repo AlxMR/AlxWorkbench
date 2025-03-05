@@ -9,10 +9,10 @@ app = FastAPI()
 # Configuración de CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://ed-frontend-theta.vercel.app"],  # Dominio de tu frontend
+    allow_origins=["*"],  # Permite todos los orígenes (ajusta según sea necesario)
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Métodos permitidos
-    allow_headers=["*"],  # Encabezados permitidos
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
 )
 
 # Modelo para la solicitud
@@ -31,6 +31,25 @@ METHOD_FORMULAS = {
     "No se pudo determinar un método específico.": r"\text{No hay fórmula general disponible}",
 }
 
+def classify_equation(eq):
+    """
+    Clasifica la ecuación diferencial de manera más precisa.
+    """
+    # Verificar si la ecuación es lineal de primer orden
+    if eq.is_linear() and eq.is_Ordinary and eq.is_FirstOrder:
+        return "Ecuaciones lineales de primer orden"
+    
+    # Verificar si la ecuación es separable
+    if eq.is_Separable:
+        return "Separación de variables"
+    
+    # Verificar si la ecuación es de Bernoulli
+    if eq.is_Bernoulli:
+        return "Ecuación de Bernoulli"
+    
+    # Si no se puede clasificar, devolver un mensaje genérico
+    return "No se pudo determinar un método específico."
+
 @app.post("/solve-ode")
 async def solve_ode(request: EquationRequest):
     equation_input = request.equation
@@ -42,17 +61,7 @@ async def solve_ode(request: EquationRequest):
 
         # Clasificación de la ecuación
         classification = classify_ode(eq, y)
-
-        # Método de solución recomendado
-        method = ""
-        if 'separable' in str(classification):
-            method = "Separación de variables"
-        elif 'linear' in str(classification):
-            method = "Ecuaciones lineales de primer orden"
-        elif 'Bernoulli' in str(classification):
-            method = "Ecuación de Bernoulli"
-        else:
-            method = "No se pudo determinar un método específico."
+        method = classify_equation(eq)  # Usar la nueva función de clasificación
 
         # Solución de la ecuación
         try:
