@@ -1,36 +1,3 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from sympy import symbols, Function, Eq, Derivative, dsolve, classify_ode, latex
-from sympy.parsing.sympy_parser import parse_expr
-from pydantic import BaseModel
-
-app = FastAPI()
-
-# Configuración de CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["https://ed-frontend-theta.vercel.app"],  # Dominio de tu frontend
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Métodos permitidos
-    allow_headers=["*"],  # Encabezados permitidos
-)
-
-# Modelo para la solicitud
-class EquationRequest(BaseModel):
-    equation: str
-
-# Definir símbolos y función desconocida
-x = symbols('x')
-y = Function('y')(x)
-
-# Diccionario con fórmulas generales de los métodos recomendados
-METHOD_FORMULAS = {
-    "Separación de variables": r"\frac{dy}{dx} = g(x)h(y) \Rightarrow \int \frac{1}{h(y)} \, dy = \int g(x) \, dx",
-    "Ecuaciones lineales de primer orden": r"\frac{dy}{dx} + P(x)y = Q(x)",
-    "Ecuación de Bernoulli": r"\frac{dy}{dx} + P(x)y = Q(x)y^n",
-    "No se pudo determinar un método específico.": r"\text{No hay fórmula general disponible}",
-}
-
 @app.post("/solve-ode")
 async def solve_ode(request: EquationRequest):
     equation_input = request.equation
@@ -57,18 +24,14 @@ async def solve_ode(request: EquationRequest):
             best_classification = classification[0]
 
             # Priorizar métodos de forma correcta
-            if best_classification == "1st_linear":
-                method = "Ecuaciones lineales de primer orden"
-            elif best_classification == "Bernoulli":
+            if best_classification == "Bernoulli":
                 method = "Ecuación de Bernoulli"
+            elif best_classification == "1st_linear":
+                method = "Ecuaciones lineales de primer orden"
             elif best_classification == "separable":
                 method = "Separación de variables"
             else:
                 method = "No se pudo determinar un método específico."
-
-        # CORRECCIÓN: Detectar ecuaciones de la forma dy/dx = f(x)
-        if best_classification == "separable" and "1st_linear" in classification:
-            method = "Ecuaciones lineales de primer orden"
 
         # Solución de la ecuación diferencial
         try:
@@ -84,7 +47,7 @@ async def solve_ode(request: EquationRequest):
         return {
             "classification": {
                 "type": 'Ordinaria' if 'ordinary' in str(classification) else 'Parcial',
-                "order": classification[1] if len(classification) >= 2 else None,
+                "order": 1 if '1st' in str(classification) else None,  # Corregir el orden
                 "linearity": 'Lineal' if best_classification == "1st_linear" else 'No lineal',
                 "homogeneity": 'Homogénea' if "homogeneous" in classification else 'No homogénea',
             },
@@ -94,13 +57,3 @@ async def solve_ode(request: EquationRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error al procesar la ecuación: {e}")
-
-# Ruta para manejar solicitudes OPTIONS en la raíz
-@app.options("/")
-async def handle_options():
-    return {"message": "OK"}
-
-# Ruta para manejar solicitudes OPTIONS en /solve-ode
-@app.options("/solve-ode")
-async def handle_solve_ode_options():
-    return {"message": "OK"}
