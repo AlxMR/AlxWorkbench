@@ -77,6 +77,9 @@ async def solve_ode(request: EquationRequest):
             else:
                 method = "No se pudo determinar un método específico."
 
+        # Determinar la linealidad de la ecuación
+        is_linear = 'linear' in str(classification)
+
         # Solución de la ecuación diferencial
         try:
             solution = dsolve(eq, y)
@@ -92,7 +95,7 @@ async def solve_ode(request: EquationRequest):
             "classification": {
                 "type": equation_type,  # Ordinaria o Parcial
                 "order": equation_order,  # Orden de la ecuación
-                "linearity": 'Lineal' if best_classification == "1st_linear" else 'No lineal',
+                "linearity": 'Lineal' if is_linear else 'No lineal',
                 "homogeneity": 'Homogénea' if "homogeneous" in classification else 'No homogénea',
             },
             "method": method,
