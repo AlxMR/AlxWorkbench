@@ -36,6 +36,16 @@ def is_ordinary(eq):
     """Determina si la ecuación diferencial es ordinaria."""
     return eq.has(Derivative) and all(arg == x for arg in eq.free_symbols)
 
+# Función para determinar si la ecuación es lineal de primer orden
+def is_linear_first_order(eq):
+    """Determina si la ecuación es lineal de primer orden."""
+    try:
+        # Intentar resolver la ecuación como lineal de primer orden
+        solution = dsolve(eq, y, hint='1st_linear')
+        return True
+    except:
+        return False
+
 @app.post("/solve-ode")
 async def solve_ode(request: EquationRequest):
     equation_input = request.equation
@@ -60,6 +70,9 @@ async def solve_ode(request: EquationRequest):
         # Determinar el orden de la ecuación
         equation_order = 1 if '1st' in str(classification) else None
 
+        # Determinar la linealidad de la ecuación
+        is_linear = 'linear' in str(classification)
+
         # Asegurar que tenemos al menos un método identificado
         if not classification:
             method = "No se pudo determinar un método específico."
@@ -68,17 +81,14 @@ async def solve_ode(request: EquationRequest):
             best_classification = classification[0]
 
             # Priorizar métodos de forma correcta
-            if best_classification == "Bernoulli":
-                method = "Ecuación de Bernoulli"
-            elif best_classification == "1st_linear":
+            if is_linear_first_order(eq):
                 method = "Ecuaciones lineales de primer orden"
+            elif best_classification == "Bernoulli":
+                method = "Ecuación de Bernoulli"
             elif best_classification == "separable":
                 method = "Separación de variables"
             else:
                 method = "No se pudo determinar un método específico."
-
-        # Determinar la linealidad de la ecuación
-        is_linear = 'linear' in str(classification)
 
         # Solución de la ecuación diferencial
         try:
