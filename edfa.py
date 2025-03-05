@@ -31,6 +31,11 @@ METHOD_FORMULAS = {
     "No se pudo determinar un método específico.": r"\text{No hay fórmula general disponible}",
 }
 
+# Función para determinar si la ecuación es ordinaria
+def is_ordinary(eq):
+    """Determina si la ecuación diferencial es ordinaria."""
+    return eq.has(Derivative) and all(arg == x for arg in eq.free_symbols)
+
 @app.post("/solve-ode")
 async def solve_ode(request: EquationRequest):
     equation_input = request.equation
@@ -50,8 +55,7 @@ async def solve_ode(request: EquationRequest):
         classification = classify_ode(eq, y)
 
         # Determinar si la ecuación es ordinaria o parcial
-        is_ordinary = 'ordinary' in str(classification)
-        equation_type = 'Ordinaria' if is_ordinary else 'Parcial'
+        equation_type = 'Ordinaria' if is_ordinary(eq) else 'Parcial'
 
         # Determinar el orden de la ecuación
         equation_order = 1 if '1st' in str(classification) else None
