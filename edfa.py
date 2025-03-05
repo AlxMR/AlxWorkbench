@@ -9,10 +9,10 @@ app = FastAPI()
 # Configuración de CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Permite todos los orígenes (ajusta según sea necesario)
+    allow_origins=["https://ed-frontend-theta.vercel.app"],  # Dominio de tu frontend
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Métodos permitidos
+    allow_headers=["*"],  # Encabezados permitidos
 )
 
 # Modelo para la solicitud
@@ -22,33 +22,6 @@ class EquationRequest(BaseModel):
 # Definir símbolos y funciones
 x = symbols('x')
 y = Function('y')(x)
-
-# Fórmulas generales de los métodos recomendados
-METHOD_FORMULAS = {
-    "Separación de variables": r"\frac{dy}{dx} = g(x)h(y) \Rightarrow \int \frac{1}{h(y)} \, dy = \int g(x) \, dx",
-    "Ecuaciones lineales de primer orden": r"\frac{dy}{dx} + P(x)y = Q(x)",
-    "Ecuación de Bernoulli": r"\frac{dy}{dx} + P(x)y = Q(x)y^n",
-    "No se pudo determinar un método específico.": r"\text{No hay fórmula general disponible}",
-}
-
-def classify_equation(eq):
-    """
-    Clasifica la ecuación diferencial de manera más precisa.
-    """
-    # Verificar si la ecuación es lineal de primer orden
-    if eq.is_linear() and eq.is_Ordinary and eq.is_FirstOrder:
-        return "Ecuaciones lineales de primer orden"
-    
-    # Verificar si la ecuación es separable
-    if eq.is_Separable:
-        return "Separación de variables"
-    
-    # Verificar si la ecuación es de Bernoulli
-    if eq.is_Bernoulli:
-        return "Ecuación de Bernoulli"
-    
-    # Si no se puede clasificar, devolver un mensaje genérico
-    return "No se pudo determinar un método específico."
 
 @app.post("/solve-ode")
 async def solve_ode(request: EquationRequest):
@@ -61,7 +34,17 @@ async def solve_ode(request: EquationRequest):
 
         # Clasificación de la ecuación
         classification = classify_ode(eq, y)
-        method = classify_equation(eq)  # Usar la nueva función de clasificación
+
+        # Método de solución recomendado
+        method = ""
+        if 'separable' in str(classification):
+            method = "Separación de variables"
+        elif 'linear' in str(classification):
+            method = "Ecuaciones lineales de primer orden"
+        elif 'Bernoulli' in str(classification):
+            method = "Ecuación de Bernoulli"
+        else:
+            method = "No se pudo determinar un método específico."
 
         # Solución de la ecuación
         try:
@@ -69,9 +52,6 @@ async def solve_ode(request: EquationRequest):
             solution_latex = latex(solution)
         except NotImplementedError:
             solution_latex = "No se pudo encontrar una solución analítica."
-
-        # Obtener la fórmula general del método recomendado
-        recommended_formula = METHOD_FORMULAS.get(method, r"\text{No hay fórmula general disponible}")
 
         # Respuesta
         return {
@@ -82,7 +62,6 @@ async def solve_ode(request: EquationRequest):
                 "homogeneity": 'Homogénea' if len(classification) >= 4 and classification[3] else 'No homogénea',
             },
             "method": method,
-            "recommended_formula": recommended_formula,  # Fórmula general del método recomendado
             "solution": solution_latex,
         }
     except Exception as e:
