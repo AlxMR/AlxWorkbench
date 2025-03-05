@@ -49,15 +49,21 @@ async def solve_ode(request: EquationRequest):
         # Clasificación de la ecuación diferencial
         classification = classify_ode(eq, y)
 
-        # Método de solución recomendado
-        method = "No se pudo determinar un método específico."
-        if isinstance(classification, tuple):
-            if "separable" in classification:
-                method = "Separación de variables"
-            elif "1st_linear" in classification:  # Nombre correcto para ecuaciones lineales de primer orden
+        # Asegurar que tenemos al menos un método identificado
+        if not classification:
+            method = "No se pudo determinar un método específico."
+        else:
+            # Se toma solo la primera clasificación, que es la más específica
+            best_classification = classification[0]
+
+            if best_classification == "1st_linear":
                 method = "Ecuaciones lineales de primer orden"
-            elif "Bernoulli" in classification:
+            elif best_classification == "Bernoulli":
                 method = "Ecuación de Bernoulli"
+            elif best_classification == "separable":
+                method = "Separación de variables"
+            else:
+                method = "No se pudo determinar un método específico."
 
         # Solución de la ecuación diferencial
         try:
@@ -74,7 +80,7 @@ async def solve_ode(request: EquationRequest):
             "classification": {
                 "type": 'Ordinaria' if 'ordinary' in str(classification) else 'Parcial',
                 "order": classification[1] if len(classification) >= 2 else None,
-                "linearity": 'Lineal' if "1st_linear" in classification else 'No lineal',
+                "linearity": 'Lineal' if best_classification == "1st_linear" else 'No lineal',
                 "homogeneity": 'Homogénea' if "homogeneous" in classification else 'No homogénea',
             },
             "method": method,
