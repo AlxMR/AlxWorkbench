@@ -23,14 +23,6 @@ class EquationRequest(BaseModel):
 x = symbols('x')
 y = Function('y')(x)
 
-# Fórmulas generales de los métodos recomendados
-METHOD_FORMULAS = {
-    "Separación de variables": r"\frac{dy}{dx} = g(x)h(y) \Rightarrow \int \frac{1}{h(y)} \, dy = \int g(x) \, dx",
-    "Ecuaciones lineales de primer orden": r"\frac{dy}{dx} + P(x)y = Q(x)",
-    "Ecuación de Bernoulli": r"\frac{dy}{dx} + P(x)y = Q(x)y^n",
-    "No se pudo determinar un método específico.": r"\text{No hay fórmula general disponible}",
-}
-
 @app.post("/solve-ode")
 async def solve_ode(request: EquationRequest):
     equation_input = request.equation
@@ -61,9 +53,6 @@ async def solve_ode(request: EquationRequest):
         except NotImplementedError:
             solution_latex = "No se pudo encontrar una solución analítica."
 
-        # Obtener la fórmula general del método recomendado
-        recommended_formula = METHOD_FORMULAS.get(method, r"\text{No hay fórmula general disponible}")
-
         # Respuesta
         return {
             "classification": {
@@ -73,7 +62,6 @@ async def solve_ode(request: EquationRequest):
                 "homogeneity": 'Homogénea' if len(classification) >= 4 and classification[3] else 'No homogénea',
             },
             "method": method,
-            "recommended_formula": recommended_formula,  # Fórmula general del método recomendado
             "solution": solution_latex,
         }
     except Exception as e:
