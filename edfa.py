@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sympy import symbols, Function, Eq, Derivative, dsolve, classify_ode, latex, simplify
+from sympy import symbols, Function, Eq, Derivative, dsolve, classify_ode, latex, simplify, solve, Wild
 from sympy.parsing.sympy_parser import parse_expr
 from pydantic import BaseModel
 
@@ -38,9 +38,26 @@ def is_ordinary(eq):
 
 # Función para determinar si la ecuación es homogénea
 def is_homogeneous(eq):
+    """
+    Determina si una ecuación diferencial es homogénea.
+    """
+    from sympy import Wild, simplify
     try:
-        from sympy import homogeneous_order
-        return homogeneous_order(eq.rhs, x, y) is not None
+        # Extraer dy/dx
+        dy_dx = Derivative(y, x)
+        if isinstance(eq, Eq):
+            lhs, rhs = eq.lhs, eq.rhs
+        else:
+            lhs, rhs = eq, 0
+        # Resolver para dy/dx
+        expr = lhs - rhs
+        dy_dx_expr = solve(expr, dy_dx)[0]
+        # Verificar si es función de y/x
+        t = Wild('t')
+        pattern = y / x
+        if dy_dx_expr.subs(y, t * x).simplify() == dy_dx_expr.subs(y / x, t).simplify():
+            return True
+        return False
     except:
         return False
 
