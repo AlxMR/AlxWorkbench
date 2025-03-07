@@ -91,14 +91,15 @@ async def solve_ode(request: EquationRequest):
         if not classification:
             method = "No se pudo determinar un método específico."
         else:
-            if is_linear_first_order(eq):
+            # Priorizar métodos de forma correcta
+            if 'separable' in classification:
+                method = "Separación de variables"
+            elif is_linear_first_order(eq):
                 method = "Ecuaciones lineales de primer orden"
             elif is_bernoulli(eq):
                 method = "Ecuación de Bernoulli"
             elif is_exact(eq):
                 method = "Ecuación exacta"
-            elif 'separable' in classification:
-                method = "Separación de variables"
             else:
                 method = "No se pudo determinar un método específico."
 
