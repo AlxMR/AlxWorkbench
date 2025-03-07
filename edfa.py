@@ -52,6 +52,22 @@ def is_linear_first_order(eq):
     except:
         return False
 
+# Función para determinar si la ecuación es de Bernoulli
+def is_bernoulli(eq):
+    try:
+        dsolve(eq, y, hint='Bernoulli')
+        return True
+    except:
+        return False
+
+# Función para determinar si la ecuación es exacta
+def is_exact(eq):
+    try:
+        dsolve(eq, y, hint='1st_exact')
+        return True
+    except:
+        return False
+
 @app.post("/solve-ode")
 async def solve_ode(request: EquationRequest):
     equation_input = request.equation
@@ -75,21 +91,26 @@ async def solve_ode(request: EquationRequest):
         if not classification:
             method = "No se pudo determinar un método específico."
         else:
-            best_classification = classification[0]
             if is_linear_first_order(eq):
                 method = "Ecuaciones lineales de primer orden"
-            elif best_classification == "Bernoulli":
+            elif is_bernoulli(eq):
                 method = "Ecuación de Bernoulli"
-            elif best_classification == "separable":
-                method = "Separación de variables"
-            elif best_classification == "1st_exact":
+            elif is_exact(eq):
                 method = "Ecuación exacta"
+            elif 'separable' in classification:
+                method = "Separación de variables"
             else:
                 method = "No se pudo determinar un método específico."
 
         try:
             if method == "Ecuación exacta":
                 solution = dsolve(eq, y, hint='1st_exact')
+            elif method == "Ecuación de Bernoulli":
+                solution = dsolve(eq, y, hint='Bernoulli')
+            elif method == "Ecuaciones lineales de primer orden":
+                solution = dsolve(eq, y, hint='1st_linear')
+            elif method == "Separación de variables":
+                solution = dsolve(eq, y, hint='separable')
             else:
                 solution = dsolve(eq, y)
             solution_latex = latex(solution)
