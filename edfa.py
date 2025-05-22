@@ -3,34 +3,34 @@ from fastapi.middleware.cors import CORSMiddleware
 from sympy import (symbols, Function, Eq, Derivative, dsolve, classify_ode, 
                    latex, simplify, solve, exp, sin, cos, laplace_transform)
 from sympy.parsing.sympy_parser import parse_expr
-from sympy.abc import s
+from sympy.abc import s, t
 from pydantic import BaseModel
 
 app = FastAPI()
 
-# CORS Configuration
+# Configuración CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust for production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Request Model
+# Modelo de solicitud
 class EquationRequest(BaseModel):
     equation: str
 
-# Global symbols
+# Símbolos globales
 x = symbols('x', real=True)
-y_func = Function('y')  # Unevaluated function
+y = Function('y')  # Función no evaluada
 
 METHOD_FORMULAS = {
     "Separable": r"\frac{dy}{dx} = g(x)h(y) \Rightarrow \int \frac{1}{h(y)} dy = \int g(x) dx",
     "First-order linear": r"\frac{dy}{dx} + P(x)y = Q(x)",
     "Bernoulli": r"\frac{dy}{dx} + P(x)y = Q(x)y^n",
-    "Exact": r"M(x,y) + N(x,y)\frac{dy}{dx} = 0 \text{ where } \frac{\partial M}{\partial y} = \frac{\partial N}{\partial x}",
-    "Unknown": r"\text{No general formula available}"
+    "Exact": r"M(x,y)dx + N(x,y)dy = 0 \text{ con } \frac{\partial M}{\partial y} = \frac{\partial N}{\partial x}",
+    "Unknown": r"\text{Método no identificado}"
 }
 
 def is_ordinary(eq):
@@ -38,36 +38,36 @@ def is_ordinary(eq):
 
 def is_homogeneous(eq):
     try:
-        y = y_func(x)
-        dy_dx = Derivative(y, x)
+        y_x = y(x)
+        dy_dx = Derivative(y_x, x)
         lhs, rhs = (eq.lhs, eq.rhs) if isinstance(eq, Eq) else (eq, 0)
         expr = lhs - rhs
         dy_dx_expr = solve(expr, dy_dx)[0]
         t = symbols('t')
-        return dy_dx_expr.subs(y, t*x).simplify() == dy_dx_expr.subs(y/x, t).simplify()
+        return dy_dx_expr.subs(y_x, t*x).simplify() == dy_dx_expr.subs(y_x/x, t).simplify()
     except:
         return False
 
 def is_linear_first_order(eq):
     try:
-        y = y_func(x)
-        dsolve(eq, y, hint='1st_linear')
+        y_x = y(x)
+        dsolve(eq, y_x, hint='1st_linear')
         return True
     except:
         return False
 
 def is_bernoulli(eq):
     try:
-        y = y_func(x)
-        dsolve(eq, y, hint='Bernoulli')
+        y_x = y(x)
+        dsolve(eq, y_x, hint='Bernoulli')
         return True
     except:
         return False
 
 def is_exact(eq):
     try:
-        y = y_func(x)
-        dsolve(eq, y, hint='1st_exact')
+        y_x = y(x)
+        dsolve(eq, y_x, hint='1st_exact')
         return True
     except:
         return False
@@ -75,9 +75,9 @@ def is_exact(eq):
 @app.post("/solve-ode")
 async def solve_ode(request: EquationRequest):
     try:
-        y = y_func(x)
+        y_x = y(x)  # Versión evaluada
         local_dict = {
-            'y': y,
+            'y': y_x,
             'x': x,
             'Derivative': Derivative,
             'exp': exp,
@@ -88,9 +88,9 @@ async def solve_ode(request: EquationRequest):
         equation = parse_expr(request.equation, local_dict=local_dict)
         eq = equation if isinstance(equation, Eq) else Eq(equation, 0)
 
-        classification = classify_ode(eq, y)
+        classification = classify_ode(eq, y_x)
         equation_type = 'Ordinary' if is_ordinary(eq) else 'Partial'
-        equation_order = 1 if '1st' in str(classification) else 2 if '2nd' in str(classification) else None
+        equation_order = max([int(hint[:1]) for hint in classification if hint[:1].isdigit()], default=None)
         is_linear = 'linear' in str(classification)
         is_homog = is_homogeneous(eq)
 
@@ -110,18 +110,18 @@ async def solve_ode(request: EquationRequest):
 
         try:
             if method == "Exact":
-                solution = dsolve(eq, y, hint='1st_exact')
+                solution = dsolve(eq, y_x, hint='1st_exact')
             elif method == "Bernoulli":
-                solution = dsolve(eq, y, hint='Bernoulli')
+                solution = dsolve(eq, y_x, hint='Bernoulli')
             elif method == "First-order linear":
-                solution = dsolve(eq, y, hint='1st_linear')
+                solution = dsolve(eq, y_x, hint='1st_linear')
             elif method == "Separable":
-                solution = dsolve(eq, y, hint='separable')
+                solution = dsolve(eq, y_x, hint='separable')
             else:
-                solution = dsolve(eq, y)
+                solution = dsolve(eq, y_x)
             solution_latex = latex(solution)
         except NotImplementedError:
-            solution_latex = "No analytical solution found."
+            solution_latex = "No se encontró solución analítica."
 
         return {
             "classification": {
@@ -135,14 +135,14 @@ async def solve_ode(request: EquationRequest):
             "solution": solution_latex,
         }
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error processing equation: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Error: {str(e)}")
 
 @app.post("/laplace-transform")
-async def transform_laplace(request: EquationRequest):
+async def laplace_transform_endpoint(request: EquationRequest):
     try:
-        y = y_func(x)
+        y_x = y(x)  # Versión evaluada
         local_dict = {
-            'y': y,
+            'y': y_x,
             'x': x,
             's': s,
             'Derivative': Derivative,
@@ -161,16 +161,12 @@ async def transform_laplace(request: EquationRequest):
             "simplified": latex(simplified)
         }
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Laplace transform error: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Error en Laplace: {str(e)}")
 
-@app.options("/")
-async def handle_options():
-    return {"message": "OK"}
+@app.get("/")
+async def root():
+    return {"message": "API de ecuaciones diferenciales"}
 
-@app.options("/solve-ode")
-async def handle_solve_options():
-    return {"message": "OK"}
-
-@app.options("/laplace-transform")
-async def handle_laplace_options():
+@app.options("/{path:path}")
+async def options_handler(path: str):
     return {"message": "OK"}
