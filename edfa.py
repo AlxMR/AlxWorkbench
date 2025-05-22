@@ -11,9 +11,9 @@ app = FastAPI()
 # Configuración de CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://ed-frontend-theta.vercel.app"],
+    allow_origins=["*"],  # Permite todos los orígenes temporalmente para pruebas
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -21,9 +21,9 @@ app.add_middleware(
 class EquationRequest(BaseModel):
     equation: str
 
-# Definir símbolos y función desconocida
+# Definir símbolos
 x = symbols('x', real=True)
-y = Function('y')(x)
+y_func = Function('y')  # Definimos la función y, pero no la evaluamos aún
 
 METHOD_FORMULAS = {
     "Separación de variables": r"\frac{dy}{dx} = g(x)h(y) \Rightarrow \int \frac{1}{h(y)} \, dy = \int g(x) \, dx",
@@ -33,20 +33,20 @@ METHOD_FORMULAS = {
     "No se pudo determinar un método específico.": r"\text{No hay fórmula general disponible}",
 }
 
-# ... (Las funciones is_ordinary, is_homogeneous, etc. permanecen igual) ...
-
 @app.post("/laplace-transform")
 async def laplace_transform_endpoint(request: EquationRequest):
     try:
-        # Definir símbolos y funciones necesarias
+        # Creamos y(x) para esta solicitud específica
+        y = y_func(x)
+        
         local_dict = {
             'y': y,
-            'Y': y,  # Alias común
+            'Y': y,
             'x': x,
             's': s,
             'Derivative': Derivative,
             'diff': Derivative,
-            'exp': exp,  # ¡Corregido! Importado de sympy
+            'exp': exp,
             'sin': sin,
             'cos': cos,
             'Function': Function
@@ -70,5 +70,3 @@ async def laplace_transform_endpoint(request: EquationRequest):
             status_code=400,
             detail=f"Error al calcular la transformada: {str(e)}"
         )
-
-# ... (Los otros endpoints permanecen igual) ...
