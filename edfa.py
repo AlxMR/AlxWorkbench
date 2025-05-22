@@ -1,10 +1,12 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sympy import (symbols, Function, Eq, Derivative, dsolve, classify_ode, 
-                   latex, simplify, solve, exp, sin, cos, laplace_transform)
-from sympy.parsing.sympy_parser import parse_expr
-from sympy.abc import s, t
+                   latex, simplify, solve, exp, sin, cos, laplace_transform,
+                   inverse_laplace_transform)
+from sympy.parsing.sympy_parser import (parse_expr, standard_transformations,
+                                       implicit_multiplication_application)
 from pydantic import BaseModel
+from sympy.abc import s, t
 
 app = FastAPI()
 
@@ -17,13 +19,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Modelo de solicitud
+# Modelos de solicitud
 class EquationRequest(BaseModel):
     equation: str
 
+class LaplaceRequest(BaseModel):
+    equation: str
+    initial_conditions: dict = None
+
+# Transformaciones para el parser
+transformations = (standard_transformations + (implicit_multiplication_application,))
+
 # Símbolos globales
 x = symbols('x', real=True)
-y = Function('y')  # Función no evaluada
+y = Function('y')
 
 METHOD_FORMULAS = {
     "Separable": r"\frac{dy}{dx} = g(x)h(y) \Rightarrow \int \frac{1}{h(y)} dy = \int g(x) dx",
@@ -75,7 +84,7 @@ def is_exact(eq):
 @app.post("/solve-ode")
 async def solve_ode(request: EquationRequest):
     try:
-        y_x = y(x)  # Versión evaluada
+        y_x = y(x)
         local_dict = {
             'y': y_x,
             'x': x,
@@ -85,7 +94,7 @@ async def solve_ode(request: EquationRequest):
             'cos': cos
         }
         
-        equation = parse_expr(request.equation, local_dict=local_dict)
+        equation = parse_expr(request.equation, local_dict=local_dict, transformations=transformations)
         eq = equation if isinstance(equation, Eq) else Eq(equation, 0)
 
         classification = classify_ode(eq, y_x)
@@ -134,34 +143,73 @@ async def solve_ode(request: EquationRequest):
             "formula": METHOD_FORMULAS.get(method),
             "solution": solution_latex,
         }
+
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Error al resolver EDO: {str(e)}")
 
 @app.post("/laplace-transform")
-async def laplace_transform_endpoint(request: EquationRequest):
+async def calculate_laplace(request: LaplaceRequest):
     try:
-        y_x = y(x)  # Versión evaluada
-        local_dict = {
-            'y': y_x,
-            'x': x,
+        # Entorno específico para Laplace
+        t = symbols('t', real=True, positive=True)
+        y_t = y(t)
+        env = {
+            't': t,
+            'y': y_t,
+            'Y': Function('Y')(s),
+            'dy': Derivative(y_t, t),
+            'd2y': Derivative(y_t, t, t),
+            'exp': exp,
+            'sin': sin,
+            'cos': cos,
+            'Derivative': Derivative
+        }
+
+        # Parsear ecuación con transformaciones seguras
+        expr = parse_expr(request.equation, local_dict=env, transformations=transformations)
+        
+        # Aplicar condiciones iniciales
+        if request.initial_conditions:
+            for cond, value in request.initial_conditions.items():
+                cond_expr = parse_expr(cond, local_dict=env)
+                env.update({cond_expr: value})
+
+        # Calcular transformada
+        L_expr = laplace_transform(expr, t, s, noconds=True)
+        simplified = simplify(L_expr)
+
+        return {
+            "time_domain": latex(expr),
+            "laplace_transform": latex(simplified),
+            "simplified_form": latex(simplified)
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error en Laplace: {str(e)}")
+
+@app.post("/inverse-laplace")
+async def calculate_inverse_laplace(request: EquationRequest):
+    try:
+        env = {
             's': s,
-            'Derivative': Derivative,
+            'Y': Function('Y')(s),
             'exp': exp,
             'sin': sin,
             'cos': cos
         }
 
-        expr = parse_expr(request.equation, local_dict=local_dict)
-        laplace_expr = laplace_transform(expr, x, s, noconds=True)
-        simplified = simplify(laplace_expr)
+        expr = parse_expr(request.equation, local_dict=env, transformations=transformations)
+        inv_L = inverse_laplace_transform(expr, s, t)
+        simplified = simplify(inv_L)
 
         return {
-            "original": latex(expr),
-            "transform": latex(simplified),
-            "simplified": latex(simplified)
+            "laplace_domain": latex(expr),
+            "time_domain": latex(simplified),
+            "simplified_form": latex(simplified)
         }
+
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error en Laplace: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Error en inversa: {str(e)}")
 
 @app.get("/")
 async def root():
