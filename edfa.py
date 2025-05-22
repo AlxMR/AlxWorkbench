@@ -138,12 +138,69 @@ async def solve_ode(request: EquationRequest):
 @app.post("/laplace-transform")
 async def laplace_transform_endpoint(request: EquationRequest):
     try:
-        local_dict = {'y': y, 'x': x, 'Derivative': Derivative}
+        # Definir símbolos y funciones necesarias
+        x = symbols('x', real=True)  # Variable tiempo
+        s = symbols('s')             # Variable Laplace
+        y = Function('y')(x)         # Función desconocida y(x)
+
+        # Diccionario para parsear la ecuación
+        local_dict = {
+            'y': y,
+            'Y': y,  # Opcional: alias común en Laplace
+            'x': x,
+            's': s,
+            'Derivative': Derivative,
+            'diff': Derivative,
+            'exp': exp,
+            'sin': sin,
+            'cos': cos,
+            'Function': Function,
+            'laplace_transform': laplace_transform
+        }
+
+        # Parsear la ecuación
         expr = parse_expr(request.equation, local_dict=local_dict)
-        laplace = laplace_transform(expr, x, s, noconds=True)
-        return {"laplace_transformada": str(laplace)}
+
+        # Aplicar transformada de Laplace
+        try:
+            # Manejar ecuaciones diferenciales
+            if expr.has(Derivative):
+                # Primero intentamos resolver la ecuación diferencial
+                solution = dsolve(expr, y)
+                # Luego aplicamos Laplace a la solución
+                laplace_expr = laplace_transform(solution.rhs, x, s, noconds=True)
+            else:
+                # Expresión directa (no diferencial)
+                laplace_expr = laplace_transform(expr, x, s, noconds=True)
+            
+            # Simplificar el resultado
+            simplified = simplify(laplace_expr)
+            
+            return {
+                "original_equation": latex(expr),
+                "laplace_transform": latex(simplified),
+                "simplified": latex(simplified)
+            }
+        except Exception as transform_error:
+            # Si falla, intentamos una transformada directa sin resolver
+            try:
+                laplace_expr = laplace_transform(expr, x, s, noconds=True)
+                simplified = simplify(laplace_expr)
+                return {
+                    "original_equation": latex(expr),
+                    "laplace_transform": latex(simplified),
+                    "simplified": latex(simplified)
+                }
+            except Exception as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"No se pudo calcular la transformada: {str(e)}"
+                )
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error al calcular la transformada de Laplace: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Error al procesar la ecuación: {str(e)}"
+        )
 
 @app.options("/")
 async def handle_options():
