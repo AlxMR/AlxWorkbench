@@ -1,7 +1,8 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sympy import symbols, Function, Eq, Derivative, dsolve, classify_ode, latex, simplify, solve, Wild
+from sympy import symbols, Function, Eq, Derivative, dsolve, classify_ode, latex, simplify, solve, Wild, laplace_transform, sympify
 from sympy.parsing.sympy_parser import parse_expr
+from sympy.abc import s
 from pydantic import BaseModel
 
 app = FastAPI()
@@ -23,7 +24,6 @@ class EquationRequest(BaseModel):
 x = symbols('x')
 y = Function('y')(x)
 
-# Diccionario con fórmulas generales de los métodos recomendados
 METHOD_FORMULAS = {
     "Separación de variables": r"\frac{dy}{dx} = g(x)h(y) \Rightarrow \int \frac{1}{h(y)} \, dy = \int g(x) \, dx",
     "Ecuaciones lineales de primer orden": r"\frac{dy}{dx} + P(x)y = Q(x)",
@@ -32,27 +32,16 @@ METHOD_FORMULAS = {
     "No se pudo determinar un método específico.": r"\text{No hay fórmula general disponible}",
 }
 
-# Función para determinar si la ecuación es ordinaria
 def is_ordinary(eq):
     return eq.has(Derivative) and all(arg == x for arg in eq.free_symbols)
 
-# Función para determinar si la ecuación es homogénea
 def is_homogeneous(eq):
-    """
-    Determina si una ecuación diferencial es homogénea.
-    """
-    from sympy import Wild, simplify
+    from sympy import Wild
     try:
-        # Extraer dy/dx
         dy_dx = Derivative(y, x)
-        if isinstance(eq, Eq):
-            lhs, rhs = eq.lhs, eq.rhs
-        else:
-            lhs, rhs = eq, 0
-        # Resolver para dy/dx
+        lhs, rhs = (eq.lhs, eq.rhs) if isinstance(eq, Eq) else (eq, 0)
         expr = lhs - rhs
         dy_dx_expr = solve(expr, dy_dx)[0]
-        # Verificar si es función de y/x
         t = Wild('t')
         pattern = y / x
         if dy_dx_expr.subs(y, t * x).simplify() == dy_dx_expr.subs(y / x, t).simplify():
@@ -61,7 +50,6 @@ def is_homogeneous(eq):
     except:
         return False
 
-# Función para determinar si la ecuación es lineal de primer orden
 def is_linear_first_order(eq):
     try:
         dsolve(eq, y, hint='1st_linear')
@@ -69,7 +57,6 @@ def is_linear_first_order(eq):
     except:
         return False
 
-# Función para determinar si la ecuación es de Bernoulli
 def is_bernoulli(eq):
     try:
         dsolve(eq, y, hint='Bernoulli')
@@ -77,7 +64,6 @@ def is_bernoulli(eq):
     except:
         return False
 
-# Función para determinar si la ecuación es exacta
 def is_exact(eq):
     try:
         dsolve(eq, y, hint='1st_exact')
@@ -90,7 +76,6 @@ async def solve_ode(request: EquationRequest):
     equation_input = request.equation
 
     try:
-        # Convertir la entrada en una expresión simbólica
         local_dict = {'y': y, 'x': x, 'Derivative': Derivative}
         equation = parse_expr(equation_input, local_dict=local_dict)
 
@@ -108,7 +93,6 @@ async def solve_ode(request: EquationRequest):
         if not classification:
             method = "No se pudo determinar un método específico."
         else:
-            # Priorizar métodos de forma correcta
             if 'separable' in classification:
                 method = "Separación de variables"
             elif is_linear_first_order(eq):
@@ -151,10 +135,24 @@ async def solve_ode(request: EquationRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error al procesar la ecuación: {e}")
 
+@app.post("/laplace-transform")
+async def laplace_transform_endpoint(request: EquationRequest):
+    try:
+        local_dict = {'y': y, 'x': x, 'Derivative': Derivative}
+        expr = parse_expr(request.equation, local_dict=local_dict)
+        laplace = laplace_transform(expr, x, s, noconds=True)
+        return {"laplace_transformada": str(laplace)}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error al calcular la transformada de Laplace: {e}")
+
 @app.options("/")
 async def handle_options():
     return {"message": "OK"}
 
 @app.options("/solve-ode")
 async def handle_solve_ode_options():
+    return {"message": "OK"}
+
+@app.options("/laplace-transform")
+async def handle_laplace_options():
     return {"message": "OK"}
